@@ -110,11 +110,20 @@ func (ss *Services[SESSION]) LookupService(name string) (*Service[SESSION], bool
     return s, ok
 }
 
-func (ss *Services[SESSION]) Print(tab string) {
-    fmt.Printf("%s服务:\n", ss.Desc)
-    for _, srv := range ss.Services {
-        fmt.Printf("%s%s\n", tab, srv.String())
+func (ss *Services[SESSION]) GetDescription(tab string, language string) string {
+    sb := strings.Builder{}
+    switch language {
+    case "en":
+        sb.WriteString(fmt.Sprintf("%s service:\n", ss.Desc))
+    case "ch":
+        sb.WriteString(fmt.Sprintf("%s服务:\n", ss.Desc))
+    default:
+        panic(fmt.Sprintf("not supported language '%s'", language))
     }
+    for _, srv := range ss.Services {
+        sb.WriteString(fmt.Sprintf("%s%s\n", tab, srv.GetDescription(language)))
+    }
+    return sb.String()
 }
 
 type Service[SESSION any] struct {
@@ -189,17 +198,38 @@ func (it *Service[SESSION]) register() {
 }
 
 func (it *Service[SESSION]) String() string {
-    authDesc := "是"
-    if it.auth == nil {
-        authDesc = "不"
+    return it.GetDescription("en")
+}
+
+func (it *Service[SESSION]) GetDescription(language string) string {
+    switch language {
+    case "en":
+        authDesc := "Yes"
+        if it.auth == nil {
+            authDesc = "No"
+        }
+        return fmt.Sprintf(
+            "ServiceName: \"%s\", NeedAuth: %s, ReqURL: %s,"+
+                " ReqFormat: %s%s,"+
+                " RespFormat: %s%s",
+            it.Desc, authDesc, it.GetLoc(),
+            it.GenReqFormat(), GetCommentOfStruct(it.exampleReqVal),
+            it.GenRespFormat(), GetCommentOfStruct(it.exampleRespVal))
+    case "ch":
+        authDesc := "是"
+        if it.auth == nil {
+            authDesc = "不"
+        }
+        return fmt.Sprintf(
+            "服务名: \"%s\", 需要认证: %s, 请求地址: %s,"+
+                " 请求格式: %s%s,"+
+                " 返回格式: %s%s",
+            it.Desc, authDesc, it.GetLoc(),
+            it.GenReqFormat(), GetCommentOfStruct(it.exampleReqVal),
+            it.GenRespFormat(), GetCommentOfStruct(it.exampleRespVal))
+    default:
+        panic(fmt.Sprintf("not supported language '%s'", language))
     }
-    return fmt.Sprintf(
-        "服务名: \"%s\", 需要认证: %s, 请求地址: %s,"+
-            " 请求格式: %s%s,"+
-            " 返回格式: %s%s",
-        it.Desc, authDesc, it.GetLoc(),
-        it.GenReqFormat(), GetCommentOfStruct(it.exampleReqVal),
-        it.GenRespFormat(), GetCommentOfStruct(it.exampleRespVal))
 }
 
 func Process[REQ Request, RESP any](
@@ -392,4 +422,3 @@ func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
     ss.Services = append(ss.Services, srv)
     return srv
 }
-
