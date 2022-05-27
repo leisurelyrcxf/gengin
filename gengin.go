@@ -27,8 +27,8 @@ var (
         }
     }
 
-    ErrCantGetSessionFromContext = ServiceError{errMsg: "can't get session from context", httpCode: http.StatusInternalServerError}
-    ErrTokenNotFound             = ServiceError{errMsg: "no access token found, header format should be 'Authorization: Bearer '", httpCode: http.StatusUnauthorized}
+    ErrCantGetSessionFromContext = ServiceError{ErrMsg: "can't get session from context", HttpCode: http.StatusInternalServerError}
+    ErrTokenNotFound             = ServiceError{ErrMsg: "no access token found, header format should be 'Authorization: Bearer '", HttpCode: http.StatusUnauthorized}
 )
 
 func GetCommentOfStruct(obj interface{}) string {
@@ -49,16 +49,16 @@ type Error interface {
 }
 
 type ServiceError struct {
-    errMsg   string
-    httpCode int
+    ErrMsg   string
+    HttpCode int
 }
 
 func (e ServiceError) Error() string {
-    return e.errMsg
+    return e.ErrMsg
 }
 
 func (e ServiceError) HTTPCode() int {
-    return e.httpCode
+    return e.HttpCode
 }
 
 type Request interface {
@@ -82,6 +82,17 @@ type Services[SESSION any] struct {
 
 func NewServices[SESSION any](name string, parent *gin.RouterGroup, desc string,
     authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *Services[SESSION] {
+    if errHandler == nil {
+        errHandler = func(err error) Error {
+            if err, ok := err.(Error); ok {
+                return err
+            }
+            return ServiceError{
+                ErrMsg:   err.Error(),
+                HttpCode: http.StatusInternalServerError,
+            }
+        }
+    }
     return &Services[SESSION]{
         Name: name,
         Desc: desc,
