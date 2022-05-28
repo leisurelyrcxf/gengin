@@ -121,7 +121,17 @@ func (ss *Services[SESSION]) LookupService(name string) (*Service[SESSION], bool
 	return s, ok
 }
 
-func (ss *Services[SESSION]) GetDescription(tab string, language string) string {
+func (ss *Services[SESSION]) GetDescription() string {
+	return ss.GetDescriptionEx("", "")
+}
+
+func (ss *Services[SESSION]) GetDescriptionEx(tab string, language string) string {
+	if tab == "" {
+		tab = "        "
+	}
+	if language == "" {
+		language = "en"
+	}
 	sb := strings.Builder{}
 	switch language {
 	case "en":

@@ -11,6 +11,6 @@ func main() {
 	if err := srv.RegisterServices(); err != nil {
 		log.Fatalf("Register failed: %v", err)
 	}
-	desc := srv.ServiceDescription.GetDescription("        ", "en")
+	desc := srv.ServiceDescription.GetDescription()
 	fmt.Println(desc)
 }

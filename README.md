@@ -14,7 +14,7 @@ You can use just a few lines code to create a web application, sth like below:
         Profile(ctx context.Context, req types.ProfileRequest, session *types.Session) (types.ProfileResponse, error)
     }
     
-    ....
+    ...
     
     var srv Service = your_service_impl
     
@@ -23,6 +23,11 @@ You can use just a few lines code to create a web application, sth like below:
 	
     gengin.RegisterService(services, "SignIn", "", "POST", "login", srv.SignIn)
     gengin.RegisterAuthenticatedService(services, "Profile", "", "GET", "get user profile", srv.Profile)
+    
+    ...
+    
+    fmt.Println(servies.GetDescription()) // Generate restful interfaces used to align with front end
+    
 ```
 
 Refer to example to find more detail.
