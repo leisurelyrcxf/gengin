@@ -80,6 +80,7 @@ type Services[SESSION any] struct {
 	errConvertor func(error) Error
 }
 
+// NewServices create services with a default auth function.
 func NewServices[SESSION any](name string, parent *gin.RouterGroup, desc string,
 	authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *Services[SESSION] {
 	if errHandler == nil {
@@ -199,25 +200,6 @@ func (it *Service[SESSION]) GenRespFormat() (respFormat string) {
 	return respFormat
 }
 
-func (it *Service[SESSION]) register() {
-	switch it.Method {
-	case "POST":
-		if it.auth != nil {
-			it.Parent.Group.POST("/"+it.loc, it.auth, it.handler)
-		} else {
-			it.Parent.Group.POST("/"+it.loc, it.handler)
-		}
-	case "GET":
-		if it.auth != nil {
-			it.Parent.Group.GET("/"+it.loc, it.auth, it.handler)
-		} else {
-			it.Parent.Group.GET("/"+it.loc, it.handler)
-		}
-	default:
-		panic(fmt.Sprintf("unknown method '%s'", it.Method))
-	}
-}
-
 func (it *Service[SESSION]) String() string {
 	return it.GetDescription("en")
 }
@@ -253,7 +235,107 @@ func (it *Service[SESSION]) GetDescription(language string) string {
 	}
 }
 
-func Process[REQ Request, RESP any](
+// RegisterService register a service
+// ss Services
+// name service name
+// loc service location (the url)
+// method http method
+// desc description
+// serviceFunc your own service implementation
+func RegisterService[REQ Request, RESP any, SESSION any](
+	ss *Services[SESSION],
+	name string, loc string, method string, desc string,
+	serviceFunc func(ctx context.Context, req REQ) (RESP, error)) *Service[SESSION] {
+	if _, ok := ss.LookupService(name); ok {
+		panic(fmt.Sprintf("Service '%s' already exists", name))
+	}
+
+	var (
+		req  REQ
+		resp RESP
+	)
+	srv := &Service[SESSION]{
+		Name:   name,
+		loc:    genLoc(name, loc),
+		Method: method,
+		Desc:   desc,
+
+		Parent: ss,
+		handler: func(c *gin.Context) {
+			process(c, ss.errConvertor, serviceFunc)
+		},
+
+		exampleReqVal:  req,
+		exampleRespVal: resp,
+	}
+	srv.register()
+	ss.serviceMap[name] = srv
+	ss.Services = append(ss.Services, srv)
+	return srv
+}
+
+// RegisterAuthenticatedService register a service which needs authentication
+// ss Services
+// name service name
+// loc service location (the url)
+// method http method
+// desc description
+// serviceFunc your own service implementation
+func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
+	ss *Services[SESSION],
+	name string, loc string, method string, desc string,
+	serviceFunc func(ctx context.Context, req REQ, session SESSION) (RESP, error)) *Service[SESSION] {
+	if _, ok := ss.LookupService(name); ok {
+		panic(fmt.Sprintf("Service '%s' already exists", name))
+	}
+
+	var (
+		req  REQ
+		resp RESP
+	)
+	srv := &Service[SESSION]{
+		Name:   name,
+		loc:    genLoc(name, loc),
+		Method: method,
+		Desc:   desc,
+
+		Parent: ss,
+		auth: func(c *gin.Context) {
+			auth(c, ss)
+		},
+		handler: func(c *gin.Context) {
+			processWithSession(c, ss.errConvertor, serviceFunc)
+		},
+
+		exampleReqVal:  req,
+		exampleRespVal: resp,
+	}
+	srv.register()
+	ss.serviceMap[name] = srv
+	ss.Services = append(ss.Services, srv)
+	return srv
+}
+
+func (it *Service[SESSION]) register() {
+	switch it.Method {
+	case "POST":
+		if it.auth != nil {
+			it.Parent.Group.POST("/"+it.loc, it.auth, it.handler)
+		} else {
+			it.Parent.Group.POST("/"+it.loc, it.handler)
+		}
+	case "GET":
+		if it.auth != nil {
+			it.Parent.Group.GET("/"+it.loc, it.auth, it.handler)
+		} else {
+			it.Parent.Group.GET("/"+it.loc, it.handler)
+		}
+	default:
+		panic(fmt.Sprintf("unknown method '%s'", it.Method))
+	}
+}
+
+func process[REQ Request, RESP any](
 	ctx *gin.Context,
 	errConvertor func(error) Error,
 	handler func(ctx context.Context, req REQ) (result RESP, _ error)) {
@@ -295,7 +377,7 @@ func Process[REQ Request, RESP any](
 	}(ctx, handler)
 }
 
-func Auth[SESSION any](ctx *gin.Context, ss *Services[SESSION]) {
+func auth[SESSION any](ctx *gin.Context, ss *Services[SESSION]) {
 	_, _, _ = func(ctx *gin.Context) (session SESSION, httpCode int, err error) {
 		const (
 			httpCodeUnknown = 0
@@ -329,7 +411,7 @@ func Auth[SESSION any](ctx *gin.Context, ss *Services[SESSION]) {
 	}(ctx)
 }
 
-func ProcessWithSession[REQ Request, RESP any, SESSION any](
+func processWithSession[REQ Request, RESP any, SESSION any](
 	ctx *gin.Context,
 	errConvertor func(error) Error,
 	handler func(context.Context, REQ, SESSION) (result RESP, _ error)) {
@@ -373,75 +455,6 @@ func ProcessWithSession[REQ Request, RESP any, SESSION any](
 		}
 		return resp, http.StatusOK, nil
 	}(ctx, handler)
-}
-
-func RegisterService[REQ Request, RESP any, SESSION any](
-	ss *Services[SESSION],
-	name string, loc string, method string, desc string,
-	serviceFunc func(ctx context.Context, req REQ) (RESP, error)) *Service[SESSION] {
-	checkLoc(name)
-	if _, ok := ss.LookupService(name); ok {
-		panic(fmt.Sprintf("Service '%s' already exists", name))
-	}
-
-	var (
-		req  REQ
-		resp RESP
-	)
-	srv := &Service[SESSION]{
-		Name:   name,
-		loc:    genLoc(name, loc),
-		Method: method,
-		Desc:   desc,
-
-		Parent: ss,
-		handler: func(c *gin.Context) {
-			Process(c, ss.errConvertor, serviceFunc)
-		},
-
-		exampleReqVal:  req,
-		exampleRespVal: resp,
-	}
-	srv.register()
-	ss.serviceMap[name] = srv
-	ss.Services = append(ss.Services, srv)
-	return srv
-}
-
-func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
-	ss *Services[SESSION],
-	name string, loc string, method string, desc string,
-	serviceFunc func(ctx context.Context, req REQ, session SESSION) (RESP, error)) *Service[SESSION] {
-	checkLoc(name)
-	if _, ok := ss.LookupService(name); ok {
-		panic(fmt.Sprintf("Service '%s' already exists", name))
-	}
-
-	var (
-		req  REQ
-		resp RESP
-	)
-	srv := &Service[SESSION]{
-		Name:   name,
-		loc:    genLoc(name, loc),
-		Method: method,
-		Desc:   desc,
-
-		Parent: ss,
-		auth: func(c *gin.Context) {
-			Auth(c, ss)
-		},
-		handler: func(c *gin.Context) {
-			ProcessWithSession(c, ss.errConvertor, serviceFunc)
-		},
-
-		exampleReqVal:  req,
-		exampleRespVal: resp,
-	}
-	srv.register()
-	ss.serviceMap[name] = srv
-	ss.Services = append(ss.Services, srv)
-	return srv
 }
 
 func genLoc(name string, loc string) string {
