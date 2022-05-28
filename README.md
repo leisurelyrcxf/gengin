@@ -7,12 +7,22 @@ Gengin can also generate restful inteface descriptions automatically.
 You can use just a few lines code to create a web application, sth like below:
 
 ```
+    type Service interface {
+        Auth(ctx context.Context, token string) (*types.Session, error)
+    
+        SignIn(ctx context.Context, req types.SigninRequest) (types.SigninResponse, error)
+        Profile(ctx context.Context, req types.ProfileRequest, session *types.Session) (types.ProfileResponse, error)
+    }
+    
+    ....
+    
+    var srv Service = your_service_impl
+    
     v1 := s.Group("v1")
-
-    s.ServiceDescription = gengin.NewServices("usr", v1, "User", s.service.Auth, nil)
+    services := gengin.NewServices("usr", v1, "User", srv.Auth, nil)
 	
-    gengin.RegisterService(s.ServiceDescription, "SignIn", "", "POST", "login", s.service.SignIn)
-    gengin.RegisterAuthenticatedService(s.ServiceDescription, "Profile", "", "GET", "get user profile", s.service.Profile)
+    gengin.RegisterService(services, "SignIn", "", "POST", "login", srv.SignIn)
+    gengin.RegisterAuthenticatedService(services, "Profile", "", "GET", "get user profile", srv.Profile)
 ```
 
 Refer to example to find more detail.
