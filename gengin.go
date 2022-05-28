@@ -136,7 +136,7 @@ func (ss *Services[SESSION]) GetDescriptionEx(tab string, language string) strin
 	switch language {
 	case "en":
 		sb.WriteString(fmt.Sprintf("%s service:\n", ss.Desc))
-	case "ch":
+	case "zh":
 		sb.WriteString(fmt.Sprintf("%s服务:\n", ss.Desc))
 	default:
 		panic(fmt.Sprintf("not supported language '%s'", language))
@@ -236,7 +236,7 @@ func (it *Service[SESSION]) GetDescription(language string) string {
 			it.Desc, authDesc, it.GetLoc(),
 			it.GenReqFormat(), GetCommentOfStruct(it.exampleReqVal),
 			it.GenRespFormat(), GetCommentOfStruct(it.exampleRespVal))
-	case "ch":
+	case "zh":
 		authDesc := "是"
 		if it.auth == nil {
 			authDesc = "不"
