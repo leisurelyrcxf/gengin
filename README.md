@@ -7,7 +7,7 @@ Gengin can also generate restful inteface descriptions automatically.
 You can use just a few lines code to create a web application, sth like below:
 
 ```
-v1 := s.Group("v1")
+    v1 := s.Group("v1")
 
     s.ServiceDescription = gengin.NewServices("usr", v1, "User", s.service.Auth, nil)
 	
