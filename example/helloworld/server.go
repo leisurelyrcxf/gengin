@@ -34,8 +34,9 @@ func (s *Server) RegisterServices() error {
 	v1 := s.Group("v1")
 
 	s.ServiceDescription = gengin.NewServices("usr", v1, "User", s.service.Auth, nil)
-	gengin.RegisterService(s.ServiceDescription, "SignIn", "POST", "login", s.service.SignIn)
-	gengin.RegisterAuthenticatedService(s.ServiceDescription, "Profile", "GET", "get user profile", s.service.Profile)
+
+	gengin.RegisterService(s.ServiceDescription, "SignIn", "", "POST", "login", s.service.SignIn)
+	gengin.RegisterAuthenticatedService(s.ServiceDescription, "Profile", "", "GET", "get user profile", s.service.Profile)
 	return nil
 }
 
