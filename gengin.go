@@ -74,7 +74,7 @@ type IService interface {
 	String() string
 }
 
-type ServiceStore[SESSION any] struct {
+type ServiceGroup[SESSION any] struct {
 	Name string
 	Desc string
 
@@ -90,7 +90,7 @@ type ServiceStore[SESSION any] struct {
 
 // NewServiceStore create services with a default auth function.
 func NewServiceStore[SESSION any](name string, parent *gin.RouterGroup, desc string,
-	authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *ServiceStore[SESSION] {
+	authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *ServiceGroup[SESSION] {
 	if errHandler == nil {
 		errHandler = func(err error) Error {
 			if err, ok := err.(Error); ok {
@@ -102,7 +102,7 @@ func NewServiceStore[SESSION any](name string, parent *gin.RouterGroup, desc str
 			}
 		}
 	}
-	return &ServiceStore[SESSION]{
+	return &ServiceGroup[SESSION]{
 		Name: name,
 		Desc: desc,
 
@@ -117,7 +117,7 @@ func NewServiceStore[SESSION any](name string, parent *gin.RouterGroup, desc str
 	}
 }
 
-func (ss *ServiceStore[SESSION]) MustLookupService(name string) IService {
+func (ss *ServiceGroup[SESSION]) MustLookupService(name string) IService {
 	service, ok := ss.serviceMap[name]
 	if !ok {
 		panic(fmt.Sprintf("service '%s' not found", name))
@@ -125,16 +125,16 @@ func (ss *ServiceStore[SESSION]) MustLookupService(name string) IService {
 	return service
 }
 
-func (ss *ServiceStore[SESSION]) LookupService(name string) (IService, bool) {
+func (ss *ServiceGroup[SESSION]) LookupService(name string) (IService, bool) {
 	s, ok := ss.serviceMap[name]
 	return s, ok
 }
 
-func (ss *ServiceStore[SESSION]) GetDescription() string {
+func (ss *ServiceGroup[SESSION]) GetDescription() string {
 	return ss.GetDescriptionEx("", "")
 }
 
-func (ss *ServiceStore[SESSION]) GetDescriptionEx(tab string, language string) string {
+func (ss *ServiceGroup[SESSION]) GetDescriptionEx(tab string, language string) string {
 	if tab == "" {
 		tab = "        "
 	}
@@ -162,7 +162,7 @@ type Service[SESSION any, REQ Request, RESP any] struct {
 	Method string
 	Desc   string
 
-	Parent  *ServiceStore[SESSION]
+	Parent  *ServiceGroup[SESSION]
 	auth    gin.HandlerFunc
 	handler gin.HandlerFunc
 
@@ -246,7 +246,7 @@ func (it *Service[SESSION, REQ, RESP]) GetDescription(language string) string {
 // desc description
 // serviceFunc your own service implementation
 func RegisterService[REQ Request, RESP any, SESSION any](
-	ss *ServiceStore[SESSION],
+	ss *ServiceGroup[SESSION],
 	name string, loc string, method string, desc string,
 	serviceFunc func(ctx context.Context, req REQ) (RESP, error)) *Service[SESSION, REQ, RESP] {
 	if _, ok := ss.LookupService(name); ok {
@@ -285,7 +285,7 @@ func RegisterService[REQ Request, RESP any, SESSION any](
 // desc description
 // serviceFunc your own service implementation
 func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
-	ss *ServiceStore[SESSION],
+	ss *ServiceGroup[SESSION],
 	name string, loc string, method string, desc string,
 	serviceFunc func(ctx context.Context, req REQ, session SESSION) (RESP, error)) *Service[SESSION, REQ, RESP] {
 	if _, ok := ss.LookupService(name); ok {
@@ -380,7 +380,7 @@ func process[REQ Request, RESP any](
 	}(ctx, handler)
 }
 
-func auth[SESSION any](ctx *gin.Context, ss *ServiceStore[SESSION]) {
+func auth[SESSION any](ctx *gin.Context, ss *ServiceGroup[SESSION]) {
 	_, _, _ = func(ctx *gin.Context) (session SESSION, httpCode int, err error) {
 		const (
 			httpCodeUnknown = 0

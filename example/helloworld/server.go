@@ -16,7 +16,7 @@ type Server struct {
 
 	service service.Service
 
-	ServiceDescription *gengin.ServiceStore[*types.Session]
+	ServiceDescription *gengin.ServiceGroup[*types.Session]
 
 	port int
 }
