@@ -16,7 +16,7 @@ type Server struct {
 
 	service service.Service
 
-	ServiceDescription *gengin.Services[*types.Session]
+	ServiceDescription *gengin.ServiceStore[*types.Session]
 
 	port int
 }
@@ -33,7 +33,7 @@ func (s *Server) RegisterServices() error {
 	s.service = service.NewServiceImpl()
 	v1 := s.Group("v1")
 
-	s.ServiceDescription = gengin.NewServices("usr", v1, "User", s.service.Auth, nil)
+	s.ServiceDescription = gengin.NewServiceStore("usr", v1, "User", s.service.Auth, nil)
 
 	gengin.RegisterService(s.ServiceDescription, "SignIn", "", "POST", "login", s.service.SignIn)
 	gengin.RegisterAuthenticatedService(s.ServiceDescription, "Profile", "", "GET", "get user profile", s.service.Profile)

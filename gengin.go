@@ -66,23 +66,23 @@ type Request interface {
 	Validate() error
 }
 
-type Services[SESSION any] struct {
+type ServiceStore[SESSION any] struct {
 	Name string
 	Desc string
 
 	Parent *gin.RouterGroup
 	Group  *gin.RouterGroup
 
-	Services   []*Service[SESSION]
-	serviceMap map[string]*Service[SESSION]
+	Services   []*Service[SESSION, REQ, RESP]
+	serviceMap map[string]*Service[SESSION, REQ, RESP]
 
 	authFunc     func(ctx context.Context, token string) (SESSION, error)
 	errConvertor func(error) Error
 }
 
-// NewServices create services with a default auth function.
-func NewServices[SESSION any](name string, parent *gin.RouterGroup, desc string,
-	authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *Services[SESSION] {
+// NewServiceStore create services with a default auth function.
+func NewServiceStore[SESSION any](name string, parent *gin.RouterGroup, desc string,
+	authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *ServiceStore[SESSION] {
 	if errHandler == nil {
 		errHandler = func(err error) Error {
 			if err, ok := err.(Error); ok {
@@ -94,7 +94,7 @@ func NewServices[SESSION any](name string, parent *gin.RouterGroup, desc string,
 			}
 		}
 	}
-	return &Services[SESSION]{
+	return &ServiceStore[SESSION]{
 		Name: name,
 		Desc: desc,
 
@@ -102,14 +102,14 @@ func NewServices[SESSION any](name string, parent *gin.RouterGroup, desc string,
 		Group:  parent.Group(name),
 
 		Services:   nil,
-		serviceMap: make(map[string]*Service[SESSION]),
+		serviceMap: make(map[string]*Service[SESSION, REQ, RESP]),
 
 		authFunc:     authFunc,
 		errConvertor: errHandler,
 	}
 }
 
-func (ss *Services[SESSION]) MustLookupService(name string) *Service[SESSION] {
+func (ss *ServiceStore[SESSION]) MustLookupService(name string) *Service[SESSION, REQ, RESP] {
 	service, ok := ss.serviceMap[name]
 	if !ok {
 		panic(fmt.Sprintf("service '%s' not found", name))
@@ -117,16 +117,16 @@ func (ss *Services[SESSION]) MustLookupService(name string) *Service[SESSION] {
 	return service
 }
 
-func (ss *Services[SESSION]) LookupService(name string) (*Service[SESSION], bool) {
+func (ss *ServiceStore[SESSION]) LookupService(name string) (*Service[SESSION, REQ, RESP], bool) {
 	s, ok := ss.serviceMap[name]
 	return s, ok
 }
 
-func (ss *Services[SESSION]) GetDescription() string {
+func (ss *ServiceStore[SESSION]) GetDescription() string {
 	return ss.GetDescriptionEx("", "")
 }
 
-func (ss *Services[SESSION]) GetDescriptionEx(tab string, language string) string {
+func (ss *ServiceStore[SESSION]) GetDescriptionEx(tab string, language string) string {
 	if tab == "" {
 		tab = "        "
 	}
@@ -148,40 +148,42 @@ func (ss *Services[SESSION]) GetDescriptionEx(tab string, language string) strin
 	return sb.String()
 }
 
-type Service[SESSION any] struct {
+type Service[SESSION any, REQ Request, RESP any] struct {
 	Name   string
 	loc    string
 	Method string
 	Desc   string
 
-	Parent  *Services[SESSION]
+	Parent  *ServiceStore[SESSION]
 	auth    gin.HandlerFunc
 	handler gin.HandlerFunc
 
-	exampleReqVal  interface{}
-	exampleRespVal interface{}
+	exampleReqVal  REQ
+	exampleRespVal RESP
 }
 
-func (it *Service[SESSION]) SetExampleReqValue(val interface{}) {
+func (it *Service[SESSION, REQ, RESP]) SetExampleReqValue(val REQ) *Service[SESSION, REQ, RESP] {
 	it.exampleReqVal = val
+	return it
 }
 
-func (it *Service[SESSION]) SetExampleRespValue(val interface{}) {
+func (it *Service[SESSION, REQ, RESP]) SetExampleRespValue(val RESP) *Service[SESSION, REQ, RESP] {
 	it.exampleRespVal = val
+	return it
 }
 
-func (it *Service[SESSION]) GetLoc() string {
+func (it *Service[SESSION, REQ, RESP]) GetLoc() string {
 	return it.Parent.Group.BasePath() + "/" + it.loc
 }
 
-func (it *Service[SESSION]) GenReqFormat() string {
+func (it *Service[SESSION, REQ, RESP]) GenReqFormat() string {
 	if it.exampleReqVal == nil {
 		panic("it.exampleReqVal == nil")
 	}
 	return MustMarshalJson(it.exampleReqVal)
 }
 
-func (it *Service[SESSION]) GenRespFormat() (respFormat string) {
+func (it *Service[SESSION, REQ, RESP]) GenRespFormat() (respFormat string) {
 	if it.exampleRespVal == nil {
 		panic("it.exampleRespVal == nil")
 	}
@@ -200,11 +202,11 @@ func (it *Service[SESSION]) GenRespFormat() (respFormat string) {
 	return respFormat
 }
 
-func (it *Service[SESSION]) String() string {
+func (it *Service[SESSION, REQ, RESP]) String() string {
 	return it.GetDescription("en")
 }
 
-func (it *Service[SESSION]) GetDescription(language string) string {
+func (it *Service[SESSION, REQ, RESP]) GetDescription(language string) string {
 	switch language {
 	case "en":
 		authDesc := "Yes"
@@ -243,9 +245,9 @@ func (it *Service[SESSION]) GetDescription(language string) string {
 // desc description
 // serviceFunc your own service implementation
 func RegisterService[REQ Request, RESP any, SESSION any](
-	ss *Services[SESSION],
+	ss *ServiceStore[SESSION],
 	name string, loc string, method string, desc string,
-	serviceFunc func(ctx context.Context, req REQ) (RESP, error)) *Service[SESSION] {
+	serviceFunc func(ctx context.Context, req REQ) (RESP, error)) *Service[SESSION, REQ, RESP] {
 	if _, ok := ss.LookupService(name); ok {
 		panic(fmt.Sprintf("Service '%s' already exists", name))
 	}
@@ -254,7 +256,7 @@ func RegisterService[REQ Request, RESP any, SESSION any](
 		req  REQ
 		resp RESP
 	)
-	srv := &Service[SESSION]{
+	srv := &Service[SESSION, REQ, RESP]{
 		Name:   name,
 		loc:    genLoc(name, loc),
 		Method: method,
@@ -282,9 +284,9 @@ func RegisterService[REQ Request, RESP any, SESSION any](
 // desc description
 // serviceFunc your own service implementation
 func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
-	ss *Services[SESSION],
+	ss *ServiceStore[SESSION],
 	name string, loc string, method string, desc string,
-	serviceFunc func(ctx context.Context, req REQ, session SESSION) (RESP, error)) *Service[SESSION] {
+	serviceFunc func(ctx context.Context, req REQ, session SESSION) (RESP, error)) *Service[SESSION, REQ, RESP] {
 	if _, ok := ss.LookupService(name); ok {
 		panic(fmt.Sprintf("Service '%s' already exists", name))
 	}
@@ -293,7 +295,7 @@ func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
 		req  REQ
 		resp RESP
 	)
-	srv := &Service[SESSION]{
+	srv := &Service[SESSION, REQ, RESP]{
 		Name:   name,
 		loc:    genLoc(name, loc),
 		Method: method,
@@ -316,7 +318,7 @@ func RegisterAuthenticatedService[REQ Request, RESP any, SESSION any](
 	return srv
 }
 
-func (it *Service[SESSION]) register() {
+func (it *Service[SESSION, REQ, RESP]) register() {
 	switch it.Method {
 	case "POST":
 		if it.auth != nil {
@@ -377,7 +379,7 @@ func process[REQ Request, RESP any](
 	}(ctx, handler)
 }
 
-func auth[SESSION any](ctx *gin.Context, ss *Services[SESSION]) {
+func auth[SESSION any](ctx *gin.Context, ss *ServiceStore[SESSION]) {
 	_, _, _ = func(ctx *gin.Context) (session SESSION, httpCode int, err error) {
 		const (
 			httpCodeUnknown = 0
