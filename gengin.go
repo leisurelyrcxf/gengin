@@ -66,6 +66,14 @@ type Request interface {
 	Validate() error
 }
 
+type IService interface {
+	GetLoc() string
+	GenReqFormat() string
+	GenRespFormat() string
+	GetDescription(language string) string
+	String() string
+}
+
 type ServiceStore[SESSION any] struct {
 	Name string
 	Desc string
@@ -73,8 +81,8 @@ type ServiceStore[SESSION any] struct {
 	Parent *gin.RouterGroup
 	Group  *gin.RouterGroup
 
-	Services   []*Service[SESSION, REQ, RESP]
-	serviceMap map[string]*Service[SESSION, REQ, RESP]
+	Services   []IService
+	serviceMap map[string]IService
 
 	authFunc     func(ctx context.Context, token string) (SESSION, error)
 	errConvertor func(error) Error
@@ -102,14 +110,14 @@ func NewServiceStore[SESSION any](name string, parent *gin.RouterGroup, desc str
 		Group:  parent.Group(name),
 
 		Services:   nil,
-		serviceMap: make(map[string]*Service[SESSION, REQ, RESP]),
+		serviceMap: make(map[string]IService),
 
 		authFunc:     authFunc,
 		errConvertor: errHandler,
 	}
 }
 
-func (ss *ServiceStore[SESSION]) MustLookupService(name string) *Service[SESSION, REQ, RESP] {
+func (ss *ServiceStore[SESSION]) MustLookupService(name string) IService {
 	service, ok := ss.serviceMap[name]
 	if !ok {
 		panic(fmt.Sprintf("service '%s' not found", name))
@@ -117,7 +125,7 @@ func (ss *ServiceStore[SESSION]) MustLookupService(name string) *Service[SESSION
 	return service
 }
 
-func (ss *ServiceStore[SESSION]) LookupService(name string) (*Service[SESSION, REQ, RESP], bool) {
+func (ss *ServiceStore[SESSION]) LookupService(name string) (IService, bool) {
 	s, ok := ss.serviceMap[name]
 	return s, ok
 }
@@ -177,17 +185,10 @@ func (it *Service[SESSION, REQ, RESP]) GetLoc() string {
 }
 
 func (it *Service[SESSION, REQ, RESP]) GenReqFormat() string {
-	if it.exampleReqVal == nil {
-		panic("it.exampleReqVal == nil")
-	}
 	return MustMarshalJson(it.exampleReqVal)
 }
 
 func (it *Service[SESSION, REQ, RESP]) GenRespFormat() (respFormat string) {
-	if it.exampleRespVal == nil {
-		panic("it.exampleRespVal == nil")
-	}
-
 	respType := reflect.ValueOf(it.exampleRespVal).Type()
 	respKind := respType.Kind()
 	if respKind != reflect.Slice {
