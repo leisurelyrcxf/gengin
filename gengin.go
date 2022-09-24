@@ -88,8 +88,8 @@ type ServiceGroup[SESSION any] struct {
 	errConvertor func(error) Error
 }
 
-// NewServiceStore create services with a default auth function.
-func NewServiceStore[SESSION any](name string, parent *gin.RouterGroup, desc string,
+// NewServiceGroup create services with a default auth function.
+func NewServiceGroup[SESSION any](name string, parent *gin.RouterGroup, desc string,
 	authFunc func(ctx context.Context, token string) (SESSION, error), errHandler func(error) Error) *ServiceGroup[SESSION] {
 	if errHandler == nil {
 		errHandler = func(err error) Error {
